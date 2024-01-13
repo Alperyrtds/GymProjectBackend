@@ -1,0 +1,2 @@
+
+Scaffold-DbContext 'Server=sql.bsite.net\MSSQL2016;Initial Catalog=alperyurtdas_GymProject;Persist Security Info=False;User ID=alperyurtdas_GymProject;Password=8520Alper;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;' Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models -force
