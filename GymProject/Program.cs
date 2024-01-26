@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Immutable;
 using System.Text;
+using FluentValidation;
+using GymProject.Config;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +61,7 @@ builder.Services.AddDbContext<AlperyurtdasGymProjectContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("GymTracking"));
 });
-
+DependencyInjection.Configure(builder.Services);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -1,9 +1,13 @@
-﻿using GymProject.Helpers;
+﻿using FluentValidation;
+using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using GymProject.Validators;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace GymProject.Controllers
 {
@@ -13,7 +17,6 @@ namespace GymProject.Controllers
     public class CustomerController : ControllerBase
     {
         private AlperyurtdasGymProjectContext _dbContext;
-
         public CustomerController(AlperyurtdasGymProjectContext dbContext)
         {
             _dbContext = dbContext;
@@ -21,11 +24,19 @@ namespace GymProject.Controllers
 
         [HttpPost]
         [Route("MusteriEkle")]
-        public async Task<IActionResult> AddCustomer(Customer model)
+        public async Task<ApiResponse> AddCustomer(Customer model)
         {
             try
             {
-                
+                var validator = new CustomerAddValidator();
+
+                var result = await validator.ValidateAsync(model);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = {result.Errors}",null);
+                }
+
                 var customer = new Customer()
                 {
                     CustomerId = NulidGenarator.Id(),
@@ -39,33 +50,35 @@ namespace GymProject.Controllers
                 await _dbContext.Customers.AddAsync(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok(customer);
+                return new ApiResponse("Success", $"Başarıyla Eklendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
 
         }
 
         [HttpGet]
-        [Route("MusteriGetir")]
+        [Route("MusteriGetirById")]
 
-        public async Task<IActionResult> GetCustomer(string customerId)
+        public async Task<ApiResponse> GetCustomer(string customerId)
         {
             try
             {
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == customerId);
-                return customer != null ? Ok(customer) : NotFound("Müşteri Bulunamadı");
+
+                return customer != null ? new ApiResponse("Success", $"Başarıyla Getirildi", customer) 
+                    : new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
         }
@@ -73,31 +86,41 @@ namespace GymProject.Controllers
         [HttpPost]
         [Route("TumMusterileriGetir")]
 
-        public async Task<IActionResult> GetAllCustomer(string customerId)
+        public async Task<ApiResponse> GetAllCustomer()
         {
             try
             {
-                return Ok(await _dbContext.Customers.ToListAsync());
+                var customerList = await _dbContext.Customers.ToListAsync();
+                return new ApiResponse("Success", $"Başarıyla Getirildi", customerList);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
         }
 
         [HttpPut]
         [Route("MusteriGuncelle")]
 
-        public async Task<IActionResult> UpdateCustomer(Customer model)
+        public async Task<ApiResponse> UpdateCustomer(Customer model)
         {
             try
             {
+                var validator = new CustomerUpdateValidator();
+
+                var result = await validator.ValidateAsync(model);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = {result.Errors}", null);
+                }
+
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
 
                 if (customer == null)
                 {
-                    return NotFound("Müşteri Bulunamadı");
+                    return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
                 }
 
                 customer.CustomerName = model.CustomerName;
@@ -109,13 +132,13 @@ namespace GymProject.Controllers
                 _dbContext.Customers.Update(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok(customer);
+                return new ApiResponse("Success", $"Başarıyla Güncellendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
 
@@ -124,23 +147,33 @@ namespace GymProject.Controllers
         [HttpDelete]
         [Route("MusteriSil")]
 
-        public async Task<IActionResult> DeleteCustomer(string id)
+        public async Task<ApiResponse> DeleteCustomer(string id)
         {
             try
             {
+
+                var validator = new CustomerDeleteValidator();
+
+                var result = await validator.ValidateAsync(id);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = {result.Errors}", null);
+                }
+
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == id);
                 if (customer == null)
-                    return NotFound("Müşteri Bulunamadı");
+                    return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
 
                 _dbContext.Customers.Remove(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok("Başarıyla Silindi");
+                return new ApiResponse("Success", $"Başarıyla Silindi", customer);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
         }
