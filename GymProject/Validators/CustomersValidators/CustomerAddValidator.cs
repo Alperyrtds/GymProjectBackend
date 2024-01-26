@@ -1,8 +1,7 @@
 ﻿using FluentValidation;
 using GymProject.Models;
-using Microsoft.Extensions.Hosting;
 
-namespace GymProject.Validators
+namespace GymProject.Validators.CustomersValidators
 {
     public class CustomerAddValidator : AbstractValidator<Customer>
     {

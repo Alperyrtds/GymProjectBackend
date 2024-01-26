@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
 using GymProject.Models;
 
-namespace GymProject.Validators
+namespace GymProject.Validators.CustomersValidators
 {
     public class CustomerUpdateValidator : AbstractValidator<Customer>
     {

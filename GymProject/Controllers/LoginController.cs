@@ -1,13 +1,12 @@
-﻿using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using GymProject.Helpers;
 using GymProject.Models;
-using Microsoft.AspNetCore.Http;
+using GymProject.Validators;
+using GymProject.Validators.CustomersValidators;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using StockTracking.Model;
 
@@ -26,10 +25,20 @@ namespace GymProject.Controllers
             _config = configuration;
         }
         [HttpPost]
-        public async Task<IActionResult> Login(LoginModel model)
+        public async Task<ApiResponse> Login(LoginModel model)
         {
+            var validator = new LoginValidator();
+
+            var result = await validator.ValidateAsync(model);
+
+            if (!result.IsValid)
+            {
+                return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
+            }
+
             var hashedPassword = NulidGenarator.GenerateSHA512String(model.Password);
             var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.UserName == model.Username && x.UserPassword == hashedPassword);
+
             if (user != null)
             {
                 List<Claim> claims = new();
@@ -75,7 +84,9 @@ namespace GymProject.Controllers
             }
 
 
-            return user != null ? Ok(user) : NotFound();
+            return user != null
+                ? new ApiResponse("Success", $"Giriş Yapıldı.", user)
+                : new ApiResponse("Error", $"Kullanıcı Bulunamadı", null);
         }
     }
 }

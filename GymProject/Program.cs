@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Immutable;
 using System.Text;
-using FluentValidation;
 using GymProject.Config;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

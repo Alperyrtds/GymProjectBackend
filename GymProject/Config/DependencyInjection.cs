@@ -1,7 +1,6 @@
 ﻿using FluentValidation;
-using System;
 using GymProject.Models;
-using GymProject.Validators;
+using GymProject.Validators.CustomersValidators;
 
 namespace GymProject.Config
 {

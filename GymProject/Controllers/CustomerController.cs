@@ -1,13 +1,9 @@
-﻿using FluentValidation;
-using GymProject.Helpers;
+﻿using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using GymProject.Validators;
-using Microsoft.AspNetCore.Http.HttpResults;
+using GymProject.Validators.CustomersValidators;
 
 namespace GymProject.Controllers
 {
@@ -34,7 +30,7 @@ namespace GymProject.Controllers
 
                 if (!result.IsValid)
                 {
-                    return new ApiResponse("Error", $"Hata = {result.Errors}",null);
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
                 var customer = new Customer()
@@ -113,7 +109,7 @@ namespace GymProject.Controllers
 
                 if (!result.IsValid)
                 {
-                    return new ApiResponse("Error", $"Hata = {result.Errors}", null);
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
@@ -158,7 +154,7 @@ namespace GymProject.Controllers
 
                 if (!result.IsValid)
                 {
-                    return new ApiResponse("Error", $"Hata = {result.Errors}", null);
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == id);
