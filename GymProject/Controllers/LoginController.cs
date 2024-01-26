@@ -4,7 +4,6 @@ using System.Text;
 using GymProject.Helpers;
 using GymProject.Models;
 using GymProject.Validators;
-using GymProject.Validators.CustomersValidators;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -42,10 +41,12 @@ namespace GymProject.Controllers
             if (user != null)
             {
                 List<Claim> claims = new();
+
                 if (user is { AdminastorId: not null, AdministratorBool: 1 })
                 {
                     var admin = await _dbContext.Administrators.FirstOrDefaultAsync(x =>
                         x.AdministratorId == user.AdminastorId);
+
                     claims = new List<Claim>
                     {
                         new(ClaimTypes.Sid, user.AdminastorId),
@@ -53,15 +54,18 @@ namespace GymProject.Controllers
                         new(ClaimTypes.Surname, admin.AdministratorSurname),
                     };
                 }
-                if (user is { CustomerId: not null, CustomerBool: 0 })
+
+                if (user is { CustomerId: not null, CustomerBool: 1 })
                 {
-                    var admin = await _dbContext.Administrators.FirstOrDefaultAsync(x =>
-                        x.AdministratorId == user.AdminastorId);
+                    var customer = await _dbContext.Customers.FirstOrDefaultAsync(x =>
+                        x.CustomerId == user.CustomerId);
+
                     claims = new List<Claim>
                     {
                         new(ClaimTypes.Sid, user.AdminastorId),
-                        new(ClaimTypes.Name, admin.AdministratorName),
-                        new(ClaimTypes.Surname, admin.AdministratorSurname),
+                        new(ClaimTypes.Name, customer.CustomerName),
+                        new(ClaimTypes.Surname, customer.CustomerSurname),
+                        new(ClaimTypes.Email, customer.CustomerEmail),
                     };
                 }
 

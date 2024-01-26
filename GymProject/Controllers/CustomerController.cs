@@ -1,9 +1,11 @@
-﻿using GymProject.Helpers;
+﻿using System.Transactions;
+using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GymProject.Validators.CustomersValidators;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace GymProject.Controllers
 {
@@ -22,6 +24,8 @@ namespace GymProject.Controllers
         [Route("MusteriEkle")]
         public async Task<ApiResponse> AddCustomer(Customer model)
         {
+            using var context = new AlperyurtdasGymProjectContext();
+            using var transaction = context.Database.BeginTransaction();
             try
             {
                 var validator = new CustomerAddValidator();
@@ -32,6 +36,8 @@ namespace GymProject.Controllers
                 {
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
+
+               
 
                 var customer = new Customer()
                 {
@@ -46,12 +52,29 @@ namespace GymProject.Controllers
                 await _dbContext.Customers.AddAsync(customer);
                 await _dbContext.SaveChangesAsync();
 
+                var user = new User()
+                {
+                    UserId = NulidGenarator.Id(),
+                    CustomerId = customer.CustomerId,
+                    CustomerBool = 1,
+                    AdminastorId = null,
+                    AdministratorBool = 0,
+                    UserName = customer.CustomerEmail,
+                    UserPassword = NulidGenarator.GenerateSHA512String(customer.CustomerEmail)
+                };
+
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
                 return new ApiResponse("Success", $"Başarıyla Eklendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                await transaction.RollbackAsync();
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
@@ -101,6 +124,9 @@ namespace GymProject.Controllers
 
         public async Task<ApiResponse> UpdateCustomer(Customer model)
         {
+            using var context = new AlperyurtdasGymProjectContext();
+            using var transaction = context.Database.BeginTransaction();
+
             try
             {
                 var validator = new CustomerUpdateValidator();
@@ -119,6 +145,15 @@ namespace GymProject.Controllers
                     return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
                 }
 
+                if (customer.CustomerEmail != model.CustomerEmail)
+                {
+                    var user = new User();
+                    user.UserName = model.CustomerEmail;
+
+                    _dbContext.Users.Update(user);
+                    await _dbContext.SaveChangesAsync();
+                }
+
                 customer.CustomerName = model.CustomerName;
                 customer.CustomerEmail = model.CustomerEmail;
                 customer.CustomerPhoneNumber = model.CustomerPhoneNumber;
@@ -128,12 +163,15 @@ namespace GymProject.Controllers
                 _dbContext.Customers.Update(customer);
                 await _dbContext.SaveChangesAsync();
 
+                await transaction.CommitAsync();
+
                 return new ApiResponse("Success", $"Başarıyla Güncellendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                await transaction.RollbackAsync();
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
@@ -145,9 +183,10 @@ namespace GymProject.Controllers
 
         public async Task<ApiResponse> DeleteCustomer(string id)
         {
+            using var context = new AlperyurtdasGymProjectContext();
+            using var transaction = context.Database.BeginTransaction();
             try
             {
-
                 var validator = new CustomerDeleteValidator();
 
                 var result = await validator.ValidateAsync(id);
@@ -158,17 +197,28 @@ namespace GymProject.Controllers
                 }
 
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == id);
+
                 if (customer == null)
+                {
                     return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
+                }
 
                 _dbContext.Customers.Remove(customer);
                 await _dbContext.SaveChangesAsync();
+
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.CustomerId == id);
+
+                _dbContext.Users.Remove(user);
+                await _dbContext.SaveChangesAsync();
+
+                await transaction.CommitAsync();
 
                 return new ApiResponse("Success", $"Başarıyla Silindi", customer);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                await transaction.RollbackAsync();
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
