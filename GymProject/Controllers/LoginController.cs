@@ -1,12 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using StockTracking.Model;
 
 namespace GymProject.Controllers
@@ -54,14 +56,18 @@ namespace GymProject.Controllers
                     };
                 }
 
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+
+                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
                 var token = new JwtSecurityToken
                 (
                     _config["Jwt:Issuer"],
                     _config["Jwt:Audience"],
                     claims,
                     expires: DateTime.UtcNow.AddMinutes(6000), //todo: parametreye taşı
-                    notBefore: DateTime.UtcNow
-
+                    notBefore: DateTime.UtcNow,
+                    signingCredentials: creds
                 );
                 var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
                 user.Claims = claims.ToArray();

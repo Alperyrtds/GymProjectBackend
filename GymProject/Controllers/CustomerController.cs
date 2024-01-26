@@ -25,6 +25,7 @@ namespace GymProject.Controllers
         {
             try
             {
+                
                 var customer = new Customer()
                 {
                     CustomerId = NulidGenarator.Id(),
