@@ -21,11 +21,10 @@ namespace GymProject.Controllers
         }
 
         [HttpPost]
-        [Route("MusteriEkle")]
+        [Route("AddCustomer")]
         public async Task<ApiResponse> AddCustomer(Customer model)
         {
-            using var context = new AlperyurtdasGymProjectContext();
-            using var transaction = context.Database.BeginTransaction();
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
             try
             {
                 var validator = new CustomerAddValidator();
@@ -82,7 +81,7 @@ namespace GymProject.Controllers
         }
 
         [HttpGet]
-        [Route("MusteriGetirById")]
+        [Route("GetCustomerById")]
 
         public async Task<ApiResponse> GetCustomer(string customerId)
         {
@@ -103,7 +102,7 @@ namespace GymProject.Controllers
         }
 
         [HttpPost]
-        [Route("TumMusterileriGetir")]
+        [Route("GetAllCustomers")]
 
         public async Task<ApiResponse> GetAllCustomer()
         {
@@ -120,12 +119,11 @@ namespace GymProject.Controllers
         }
 
         [HttpPut]
-        [Route("MusteriGuncelle")]
+        [Route("UpdateCustomer")]
 
         public async Task<ApiResponse> UpdateCustomer(Customer model)
         {
-            using var context = new AlperyurtdasGymProjectContext();
-            using var transaction = context.Database.BeginTransaction();
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
             try
             {
@@ -179,12 +177,13 @@ namespace GymProject.Controllers
         }
 
         [HttpDelete]
-        [Route("MusteriSil")]
+        [Route("DeleteCustomer")]
 
         public async Task<ApiResponse> DeleteCustomer(string id)
         {
-            using var context = new AlperyurtdasGymProjectContext();
-            using var transaction = context.Database.BeginTransaction();
+        
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
             try
             {
                 var validator = new CustomerDeleteValidator();
