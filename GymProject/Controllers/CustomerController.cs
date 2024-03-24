@@ -36,8 +36,6 @@ namespace GymProject.Controllers
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
-               
-
                 var customer = new Customer()
                 {
                     CustomerId = NulidGenarator.Id(),
