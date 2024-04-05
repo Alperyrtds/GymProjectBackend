@@ -1,12 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using StockTracking.Model;
 
 namespace GymProject.Controllers
@@ -40,17 +42,23 @@ namespace GymProject.Controllers
                         new(ClaimTypes.Sid, user.AdminastorId),
                         new(ClaimTypes.Name, admin.AdministratorName),
                         new(ClaimTypes.Surname, admin.AdministratorSurname),
+                        new(ClaimTypes.Role, "Admin"),
+
                     };
                 }
                 if (user is { CustomerId: not null, CustomerBool: 0 })
                 {
-                    var admin = await _dbContext.Administrators.FirstOrDefaultAsync(x =>
-                        x.AdministratorId == user.AdminastorId);
+                    var customer = await _dbContext.Customers.FirstOrDefaultAsync(x =>
+                        x.CustomerId == user.CustomerId);
                     claims = new List<Claim>
                     {
-                        new(ClaimTypes.Sid, user.AdminastorId),
-                        new(ClaimTypes.Name, admin.AdministratorName),
-                        new(ClaimTypes.Surname, admin.AdministratorSurname),
+                        new(ClaimTypes.Sid, user.CustomerId),
+                        new(ClaimTypes.Name, customer.CustomerName),
+                        new(ClaimTypes.Surname, customer.CustomerSurname),
+                        new(ClaimTypes.MobilePhone, customer.CustomerPhoneNumber),
+                        new(ClaimTypes.Anonymous, customer.CustomerIdentityNumber),
+                        new(ClaimTypes.Email, customer.CustomerEmail),
+                        new(ClaimTypes.Role, "Customer"),
                     };
                 }
 
@@ -61,6 +69,7 @@ namespace GymProject.Controllers
                     claims,
                     expires: DateTime.UtcNow.AddMinutes(6000), //todo: parametreye taşı
                     notBefore: DateTime.UtcNow
+                  
 
                 );
                 var tokenString = new JwtSecurityTokenHandler().WriteToken(token);

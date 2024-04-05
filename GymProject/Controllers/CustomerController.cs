@@ -21,6 +21,7 @@ namespace GymProject.Controllers
 
         [HttpPost]
         [Route("MusteriEkle")]
+      
         public async Task<IActionResult> AddCustomer(Customer model)
         {
             try
