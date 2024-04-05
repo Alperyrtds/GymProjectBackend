@@ -1,9 +1,11 @@
-﻿using GymProject.Helpers;
+﻿using System.Transactions;
+using GymProject.Helpers;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using GymProject.Validators.CustomersValidators;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace GymProject.Controllers
 {
@@ -13,19 +15,27 @@ namespace GymProject.Controllers
     public class CustomerController : ControllerBase
     {
         private AlperyurtdasGymProjectContext _dbContext;
-
         public CustomerController(AlperyurtdasGymProjectContext dbContext)
         {
             _dbContext = dbContext;
         }
 
         [HttpPost]
-        [Route("MusteriEkle")]
-      
-        public async Task<IActionResult> AddCustomer(Customer model)
+        [Route("AddCustomer")]
+        public async Task<ApiResponse> AddCustomer(Customer model)
         {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
             try
             {
+                var validator = new CustomerAddValidator();
+
+                var result = await validator.ValidateAsync(model);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
+                }
+
                 var customer = new Customer()
                 {
                     CustomerId = NulidGenarator.Id(),
@@ -39,65 +49,105 @@ namespace GymProject.Controllers
                 await _dbContext.Customers.AddAsync(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok(customer);
+                var user = new User()
+                {
+                    UserId = NulidGenarator.Id(),
+                    CustomerId = customer.CustomerId,
+                    CustomerBool = 1,
+                    AdminastorId = null,
+                    AdministratorBool = 0,
+                    UserName = customer.CustomerEmail,
+                    UserPassword = NulidGenarator.GenerateSHA512String(customer.CustomerEmail)
+                };
+
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return new ApiResponse("Success", $"Başarıyla Eklendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                await transaction.RollbackAsync();
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
 
         }
 
         [HttpGet]
-        [Route("MusteriGetir")]
+        [Route("GetCustomerById")]
 
-        public async Task<IActionResult> GetCustomer(string customerId)
+        public async Task<ApiResponse> GetCustomer(string customerId)
         {
             try
             {
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == customerId);
-                return customer != null ? Ok(customer) : NotFound("Müşteri Bulunamadı");
+
+                return customer != null ? new ApiResponse("Success", $"Başarıyla Getirildi", customer) 
+                    : new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
         }
 
         [HttpPost]
-        [Route("TumMusterileriGetir")]
+        [Route("GetAllCustomers")]
 
-        public async Task<IActionResult> GetAllCustomer(string customerId)
+        public async Task<ApiResponse> GetAllCustomer()
         {
             try
             {
-                return Ok(await _dbContext.Customers.ToListAsync());
+                var customerList = await _dbContext.Customers.ToListAsync();
+                return new ApiResponse("Success", $"Başarıyla Getirildi", customerList);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
         }
 
         [HttpPut]
-        [Route("MusteriGuncelle")]
+        [Route("UpdateCustomer")]
 
-        public async Task<IActionResult> UpdateCustomer(Customer model)
+        public async Task<ApiResponse> UpdateCustomer(Customer model)
         {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
             try
             {
+                var validator = new CustomerUpdateValidator();
+
+                var result = await validator.ValidateAsync(model);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
+                }
+
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
 
                 if (customer == null)
                 {
-                    return NotFound("Müşteri Bulunamadı");
+                    return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
+                }
+
+                if (customer.CustomerEmail != model.CustomerEmail)
+                {
+                    var user = new User();
+                    user.UserName = model.CustomerEmail;
+
+                    _dbContext.Users.Update(user);
+                    await _dbContext.SaveChangesAsync();
                 }
 
                 customer.CustomerName = model.CustomerName;
@@ -109,38 +159,64 @@ namespace GymProject.Controllers
                 _dbContext.Customers.Update(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok(customer);
+                await transaction.CommitAsync();
+
+                return new ApiResponse("Success", $"Başarıyla Güncellendi", customer);
 
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex);
+                await transaction.RollbackAsync();
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
 
             }
 
         }
 
         [HttpDelete]
-        [Route("MusteriSil")]
+        [Route("DeleteCustomer")]
 
-        public async Task<IActionResult> DeleteCustomer(string id)
+        public async Task<ApiResponse> DeleteCustomer(string id)
         {
+        
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
             try
             {
+                var validator = new CustomerDeleteValidator();
+
+                var result = await validator.ValidateAsync(id);
+
+                if (!result.IsValid)
+                {
+                    return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
+                }
+
                 var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == id);
+
                 if (customer == null)
-                    return NotFound("Müşteri Bulunamadı");
+                {
+                    return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
+                }
 
                 _dbContext.Customers.Remove(customer);
                 await _dbContext.SaveChangesAsync();
 
-                return Ok("Başarıyla Silindi");
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.CustomerId == id);
+
+                _dbContext.Users.Remove(user);
+                await _dbContext.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                return new ApiResponse("Success", $"Başarıyla Silindi", customer);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
-                return NotFound(ex.Message);
+                await transaction.RollbackAsync();
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
         }

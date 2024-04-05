@@ -1,4 +1,5 @@
 using System.Text;
+using GymProject.Config;
 using GymProject.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -50,8 +51,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-        
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
     };
 });
 
@@ -71,7 +71,7 @@ builder.Services.AddDbContext<AlperyurtdasGymProjectContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("GymTracking"));
 });
-
+DependencyInjection.Configure(builder.Services);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

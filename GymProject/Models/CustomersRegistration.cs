@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace GymProject.Models;
+﻿namespace GymProject.Models;
 
 public partial class CustomersRegistration
 {
