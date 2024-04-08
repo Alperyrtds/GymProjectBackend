@@ -63,6 +63,16 @@ namespace GymProject.Controllers
                 await _dbContext.Users.AddAsync(user);
                 await _dbContext.SaveChangesAsync();
 
+                var customerRegistration = new CustomersRegistration()
+                {
+                    CustomerId = customer.CustomerId,
+                    CustomerRegistrationStartDate = DateTime.Now,
+                    CustomerRegistrationFinishDate = DateTime.Now.AddMonths(int.Parse(model.CustomerRegistryDateLong!)),
+               
+                };
+                await _dbContext.CustomersRegistrations.AddAsync(customerRegistration);
+                await _dbContext.SaveChangesAsync();
+
                 await transaction.CommitAsync();
 
                 return new ApiResponse("Success", $"Başarıyla Eklendi", customer);
