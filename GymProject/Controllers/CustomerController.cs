@@ -65,6 +65,7 @@ namespace GymProject.Controllers
 
                 var customerRegistration = new CustomersRegistration()
                 {
+                   CustomerRegistrationId = NulidGenarator.Id(),
                     CustomerId = customer.CustomerId,
                     CustomerRegistrationStartDate = DateTime.Now,
                     CustomerRegistrationFinishDate = DateTime.Now.AddMonths(int.Parse(model.CustomerRegistryDateLong!)),
@@ -87,15 +88,19 @@ namespace GymProject.Controllers
             }
 
         }
+        public class CustomerRequest
+        {
+            public string CustomerId { get; set; }
+        }
 
-        [HttpGet]
+        [HttpPost]
         [Route("GetCustomerById")]
 
-        public async Task<ApiResponse> GetCustomer(string customerId)
+        public async Task<ApiResponse> GetCustomer([FromBody]CustomerRequest model)
         {
             try
             {
-                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == customerId);
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
 
                 return customer != null ? new ApiResponse("Success", $"Başarıyla Getirildi", customer) 
                     : new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
@@ -109,7 +114,7 @@ namespace GymProject.Controllers
 
         }
 
-        [HttpPost]
+        [HttpGet]
         [Route("GetAllCustomers")]
 
         public async Task<ApiResponse> GetAllCustomer()
@@ -165,7 +170,7 @@ namespace GymProject.Controllers
                 customer.CustomerPhoneNumber = model.CustomerPhoneNumber;
                 customer.CustomerSurname = model.CustomerSurname;
                 customer.CustomerIdentityNumber = model.CustomerIdentityNumber;
-
+                customer.CustomerRegistryDateLong = model.CustomerRegistryDateLong;
                 _dbContext.Customers.Update(customer);
                 await _dbContext.SaveChangesAsync();
 

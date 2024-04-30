@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GymProject.Models;
 
@@ -15,6 +16,7 @@ public partial class Customer
     public string? CustomerPhoneNumber { get; set; }
 
     public string? CustomerEmail { get; set; }
+
     [NotMapped]
     public string? CustomerRegistryDateLong { get; set; }
 }
