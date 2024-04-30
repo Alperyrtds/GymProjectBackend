@@ -8,7 +8,7 @@ namespace GymProject.Validators.CustomersValidators
         public CustomerUpdateValidator()
         {
             RuleFor(x => x.CustomerId).NotEmpty().WithMessage("Id Alanı boş bırakılamaz")
-                .MinimumLength(30).WithMessage("Id alanı en az 30 karakter olmalıdır.").MaximumLength(30)
+                .MinimumLength(25).WithMessage("Id alanı en az 25 karakter olmalıdır.").MaximumLength(30)
                 .WithMessage("Id alanı en fazla 30 karakter olmalıdır.");
 
             RuleFor(x => x.CustomerName)

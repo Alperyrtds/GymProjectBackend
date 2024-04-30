@@ -131,7 +131,7 @@ namespace GymProject.Controllers
             }
         }
 
-        [HttpPut]
+        [HttpPost]
         [Route("UpdateCustomer")]
 
         public async Task<ApiResponse> UpdateCustomer(Customer model)
@@ -189,10 +189,10 @@ namespace GymProject.Controllers
 
         }
 
-        [HttpDelete]
+        [HttpPost]
         [Route("DeleteCustomer")]
 
-        public async Task<ApiResponse> DeleteCustomer(string id)
+        public async Task<ApiResponse> DeleteCustomer(CustomerRequest req)
         {
         
             await using var transaction = await _dbContext.Database.BeginTransactionAsync();
@@ -201,14 +201,14 @@ namespace GymProject.Controllers
             {
                 var validator = new CustomerDeleteValidator();
 
-                var result = await validator.ValidateAsync(id);
+                var result = await validator.ValidateAsync(req.CustomerId);
 
                 if (!result.IsValid)
                 {
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
-                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == id);
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == req.CustomerId);
 
                 if (customer == null)
                 {
@@ -218,10 +218,10 @@ namespace GymProject.Controllers
                 _dbContext.Customers.Remove(customer);
                 await _dbContext.SaveChangesAsync();
 
-                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.CustomerId == id);
+                //var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.CustomerId == id);
 
-                _dbContext.Users.Remove(user);
-                await _dbContext.SaveChangesAsync();
+                //_dbContext.Users.Remove(user);
+                //await _dbContext.SaveChangesAsync();
 
                 await transaction.CommitAsync();
 
