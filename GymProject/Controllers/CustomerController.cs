@@ -1,6 +1,9 @@
-﻿using System.Transactions;
+﻿using System.Security.Claims;
+using System.Transactions;
 using GymProject.Helpers;
 using GymProject.Models;
+using GymProject.Models.Requests;
+using GymProject.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +25,8 @@ namespace GymProject.Controllers
 
         [HttpPost]
         [Route("AddCustomer")]
-        public async Task<ApiResponse> AddCustomer(Customer model)
+        [Authorize(Roles = "Admin")]
+        public async Task<ApiResponse> AddCustomer([FromBody] AddCustomerRequest model)
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync();
             try
@@ -36,39 +40,36 @@ namespace GymProject.Controllers
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
+                var userId = NulidGenarator.Id();
+                // Otomatik şifre oluştur - Ad.Soyad formatında (admin'in hatırlayabileceği)
+                var temporaryPassword = CustomerService.GenerateCustomerPassword(model.CustomerName ?? "", model.CustomerSurname ?? "");
+                var hashedPassword = NulidGenarator.GenerateSHA512String(temporaryPassword);
+                
                 var customer = new Customer()
                 {
-                    CustomerId = NulidGenarator.Id(),
+                    UserId = userId,
+                    UserName = model.CustomerEmail,
+                    UserPassword = hashedPassword,
                     CustomerEmail = model.CustomerEmail,
                     CustomerIdentityNumber = model.CustomerIdentityNumber,
                     CustomerName = model.CustomerName,
                     CustomerPhoneNumber = model.CustomerPhoneNumber,
-                    CustomerSurname = model.CustomerSurname
+                    CustomerSurname = model.CustomerSurname,
+                    IsPasswordChanged = false // İlk girişte şifre değiştirmesi gerekecek
                 };
 
                 await _dbContext.Customers.AddAsync(customer);
                 await _dbContext.SaveChangesAsync();
 
-                var user = new User()
-                {
-                    UserId = NulidGenarator.Id(),
-                    CustomerId = customer.CustomerId,
-                    CustomerBool = 1,
-                    AdminastorId = null,
-                    AdministratorBool = 0,
-                    UserName = customer.CustomerEmail,
-                    UserPassword = NulidGenarator.GenerateSHA512String(customer.CustomerEmail)
-                };
-
-                await _dbContext.Users.AddAsync(user);
-                await _dbContext.SaveChangesAsync();
-
+                var startDate = DateTime.SpecifyKind(DateTime.Now, DateTimeKind.Unspecified);
+                var finishDate = DateTime.SpecifyKind(DateTime.Now.AddMonths(int.Parse(model.CustomerRegistryDateLong!)), DateTimeKind.Unspecified);
+                
                 var customerRegistration = new CustomersRegistration()
                 {
                    CustomerRegistrationId = NulidGenarator.Id(),
-                    CustomerId = customer.CustomerId,
-                    CustomerRegistrationStartDate = DateTime.Now,
-                    CustomerRegistrationFinishDate = DateTime.Now.AddMonths(int.Parse(model.CustomerRegistryDateLong!)),
+                    CustomerId = customer.UserId, // Artık UserId kullanıyoruz
+                    CustomerRegistrationStartDate = startDate,
+                    CustomerRegistrationFinishDate = finishDate,
                
                 };
                 await _dbContext.CustomersRegistrations.AddAsync(customerRegistration);
@@ -76,7 +77,14 @@ namespace GymProject.Controllers
 
                 await transaction.CommitAsync();
 
-                return new ApiResponse("Success", $"Başarıyla Eklendi", customer);
+                // Response'a geçici şifreyi ekle (sadece bu seferlik gösterilecek)
+                var responseData = new
+                {
+                    customer,
+                    temporaryPassword = temporaryPassword // Geçici şifre - sadece bu response'da gösterilir
+                };
+
+                return new ApiResponse("Success", $"Başarıyla Eklendi. Geçici şifre: {temporaryPassword}", responseData);
 
             }
             catch (Exception ex)
@@ -88,19 +96,24 @@ namespace GymProject.Controllers
             }
 
         }
-        public class CustomerRequest
-        {
-            public string CustomerId { get; set; }
-        }
 
         [HttpPost]
         [Route("GetCustomerById")]
-
+        [Authorize(Roles = "Admin,Trainer")]
         public async Task<ApiResponse> GetCustomer([FromBody]CustomerRequest model)
         {
             try
             {
-                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
+                var userRole = User.FindFirstValue(ClaimTypes.Role);
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+
+                // Customer rolü ise sadece kendi bilgilerini görebilir
+                if (userRole == "Customer" && userId != model.UserId)
+                {
+                    return new ApiResponse("Error", $"Yetkiniz yok. Sadece kendi bilgilerinizi görüntüleyebilirsiniz.", null);
+                }
+
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.UserId == model.UserId);
 
                 return customer != null ? new ApiResponse("Success", $"Başarıyla Getirildi", customer) 
                     : new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
@@ -116,12 +129,37 @@ namespace GymProject.Controllers
 
         [HttpGet]
         [Route("GetAllCustomers")]
-
+        [Authorize(Roles = "Admin,Trainer")]
         public async Task<ApiResponse> GetAllCustomer()
         {
             try
             {
                 var customerList = await _dbContext.Customers.ToListAsync();
+
+                if (customerList != null && customerList.Count > 0)
+                {
+                    foreach (var item in customerList)
+                    {
+                        var registery =
+                            await _dbContext.CustomersRegistrations.FirstOrDefaultAsync(
+                                x => x.CustomerId == item.UserId);
+
+                        if (registery != null)
+                        {
+                            item.CustomerRegistryStartDate = registery.CustomerRegistrationStartDate.Value;
+                            item.CustomerRegistryEndDate = registery.CustomerRegistrationFinishDate.Value;
+
+                            // Kaç gün kaldığını hesapla
+                            var today = registery.CustomerRegistrationStartDate.Value.Date;
+                            var finishDate = registery.CustomerRegistrationFinishDate.Value.Date;
+                            var remainDate = (finishDate - today).Days;
+                            if (remainDate < 0) remainDate = 0; // Eğer süresi dolmuşsa 0
+
+                            item.CustomerRegistryDateLong = remainDate.ToString();
+                        } 
+                    }
+                }
+                
                 return new ApiResponse("Success", $"Başarıyla Getirildi", customerList);
             }
             catch (Exception ex)
@@ -133,13 +171,28 @@ namespace GymProject.Controllers
 
         [HttpPost]
         [Route("UpdateCustomer")]
-
-        public async Task<ApiResponse> UpdateCustomer(Customer model)
+        [Authorize(Roles = "Admin")]
+        public async Task<ApiResponse> UpdateCustomer([FromBody] UpdateCustomerRequest model)
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync();
 
             try
             {
+                var userRole = User.FindFirstValue(ClaimTypes.Role);
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+
+                // Customer rolü ise sadece kendi bilgilerini güncelleyebilir
+                if (userRole == "Customer" && userId != model.UserId)
+                {
+                    return new ApiResponse("Error", $"Yetkiniz yok. Sadece kendi bilgilerinizi güncelleyebilirsiniz.", null);
+                }
+
+                // Trainer rolü müşteri güncelleyemez
+                if (userRole == "Trainer")
+                {
+                    return new ApiResponse("Error", $"Yetkiniz yok. Müşteri bilgilerini güncelleyemezsiniz.", null);
+                }
+
                 var validator = new CustomerUpdateValidator();
 
                 var result = await validator.ValidateAsync(model);
@@ -149,28 +202,47 @@ namespace GymProject.Controllers
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
-                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == model.CustomerId);
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.UserId == model.UserId);
 
                 if (customer == null)
                 {
                     return new ApiResponse("Error", $"Hata = Müşteri Bulunamadı.", null);
                 }
 
-                if (customer.CustomerEmail != model.CustomerEmail)
+                // Email değiştiyse UserName'i de güncelle
+                if (!string.IsNullOrWhiteSpace(model.CustomerEmail) && customer.CustomerEmail != model.CustomerEmail)
                 {
-                    var user = new User();
-                    user.UserName = model.CustomerEmail;
-
-                    _dbContext.Users.Update(user);
-                    await _dbContext.SaveChangesAsync();
+                    // Yeni email'in başka bir kullanıcı tarafından kullanılıp kullanılmadığını kontrol et
+                    var existingUser = await _dbContext.Users
+                        .FirstOrDefaultAsync(x => x.UserName == model.CustomerEmail && x.UserId != model.UserId);
+                    
+                    if (existingUser != null)
+                    {
+                        return new ApiResponse("Error", "Bu e-posta adresi başka bir kullanıcı tarafından kullanılıyor.", null);
+                    }
+                    
+                    customer.UserName = model.CustomerEmail;
                 }
 
-                customer.CustomerName = model.CustomerName;
-                customer.CustomerEmail = model.CustomerEmail;
-                customer.CustomerPhoneNumber = model.CustomerPhoneNumber;
-                customer.CustomerSurname = model.CustomerSurname;
-                customer.CustomerIdentityNumber = model.CustomerIdentityNumber;
-                customer.CustomerRegistryDateLong = model.CustomerRegistryDateLong;
+                // Sadece gönderilen alanları güncelle
+                if (!string.IsNullOrWhiteSpace(model.CustomerName))
+                    customer.CustomerName = model.CustomerName;
+                
+                if (!string.IsNullOrWhiteSpace(model.CustomerEmail))
+                    customer.CustomerEmail = model.CustomerEmail;
+                
+                if (!string.IsNullOrWhiteSpace(model.CustomerPhoneNumber))
+                    customer.CustomerPhoneNumber = model.CustomerPhoneNumber;
+                
+                if (!string.IsNullOrWhiteSpace(model.CustomerSurname))
+                    customer.CustomerSurname = model.CustomerSurname;
+                
+                if (!string.IsNullOrWhiteSpace(model.CustomerIdentityNumber))
+                    customer.CustomerIdentityNumber = model.CustomerIdentityNumber;
+                
+                if (!string.IsNullOrWhiteSpace(model.CustomerRegistryDateLong))
+                    customer.CustomerRegistryDateLong = model.CustomerRegistryDateLong;
+
                 _dbContext.Customers.Update(customer);
                 await _dbContext.SaveChangesAsync();
 
@@ -191,7 +263,7 @@ namespace GymProject.Controllers
 
         [HttpPost]
         [Route("DeleteCustomer")]
-
+        [Authorize(Roles = "Admin")]
         public async Task<ApiResponse> DeleteCustomer(CustomerRequest req)
         {
         
@@ -201,14 +273,14 @@ namespace GymProject.Controllers
             {
                 var validator = new CustomerDeleteValidator();
 
-                var result = await validator.ValidateAsync(req.CustomerId);
+                var result = await validator.ValidateAsync(req.UserId);
 
                 if (!result.IsValid)
                 {
                     return new ApiResponse("Error", $"Hata = Bir Hata Oluştu", result.Errors, null);
                 }
 
-                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.CustomerId == req.CustomerId);
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.UserId == req.UserId);
 
                 if (customer == null)
                 {
@@ -234,6 +306,251 @@ namespace GymProject.Controllers
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
 
+        }
+
+
+        /// <summary>
+        /// Üye kendi profil bilgilerini görüntüleyebilir
+        /// </summary>
+        [HttpGet]
+        [Route("GetMyProfile")]
+        [Authorize(Roles = "Customer")]
+        public async Task<ApiResponse> GetMyProfile()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bilgisi bulunamadı.", null);
+                }
+
+                // Müşteri bilgilerini getir
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.UserId == userId);
+
+                if (customer == null)
+                {
+                    return new ApiResponse("Error", "Müşteri bulunamadı.", null);
+                }
+
+                // Üyelik kaydını getir
+                var registration = await _dbContext.CustomersRegistrations
+                    .Where(x => x.CustomerId == userId)
+                    .OrderByDescending(x => x.CustomerRegistrationStartDate)
+                    .FirstOrDefaultAsync();
+
+                // Kalan gün hesapla
+                int remainingDays = 0;
+                string membershipStatus = "Aktif";
+                
+                if (registration?.CustomerRegistrationFinishDate.HasValue == true)
+                {
+                    var finishDate = registration.CustomerRegistrationFinishDate.Value.Date;
+                    var today = DateTime.Now.Date;
+                    var daysDifference = (finishDate - today).Days;
+
+                    if (daysDifference > 0)
+                    {
+                        remainingDays = daysDifference;
+                        membershipStatus = "Aktif";
+                    }
+                    else if (daysDifference == 0)
+                    {
+                        remainingDays = 0;
+                        membershipStatus = "Bugün Bitiyor";
+                    }
+                    else
+                    {
+                        remainingDays = 0;
+                        membershipStatus = "Süresi Dolmuş";
+                    }
+                }
+
+                // Üyelik süresini hesapla (ay cinsinden)
+                int membershipDurationMonths = 0;
+                if (registration?.CustomerRegistrationStartDate.HasValue == true && 
+                    registration?.CustomerRegistrationFinishDate.HasValue == true)
+                {
+                    var startDate = registration.CustomerRegistrationStartDate.Value;
+                    var finishDate = registration.CustomerRegistrationFinishDate.Value;
+                    membershipDurationMonths = ((finishDate.Year - startDate.Year) * 12) + 
+                                              (finishDate.Month - startDate.Month);
+                }
+
+                // Profil bilgilerini hazırla (şifre hariç)
+                var profile = new
+                {
+                    UserId = customer.UserId,
+                    UserName = customer.UserName,
+                    CustomerName = customer.CustomerName,
+                    CustomerSurname = customer.CustomerSurname,
+                    CustomerEmail = customer.CustomerEmail,
+                    CustomerPhoneNumber = customer.CustomerPhoneNumber,
+                    CustomerIdentityNumber = customer.CustomerIdentityNumber,
+                    IsPasswordChanged = customer.IsPasswordChanged,
+                    Membership = new
+                    {
+                        StartDate = registration?.CustomerRegistrationStartDate?.ToString("yyyy-MM-dd"),
+                        FinishDate = registration?.CustomerRegistrationFinishDate?.ToString("yyyy-MM-dd"),
+                        RemainingDays = remainingDays,
+                        Status = membershipStatus,
+                        DurationMonths = membershipDurationMonths,
+                        IsActive = remainingDays > 0 || membershipStatus == "Bugün Bitiyor"
+                    }
+                };
+
+                return new ApiResponse("Success", "Profil bilgileri başarıyla getirildi.", profile);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Üye kendi üyelik bilgilerini ve kalan gün sayısını görüntüleyebilir
+        /// </summary>
+        [HttpGet]
+        [Route("GetMyMembershipInfo")]
+        [Authorize(Roles = "Customer")]
+        public async Task<ApiResponse> GetMyMembershipInfo()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bilgisi bulunamadı.", null);
+                }
+
+                // Üyelik kaydını getir
+                var registration = await _dbContext.CustomersRegistrations
+                    .Where(x => x.CustomerId == userId)
+                    .OrderByDescending(x => x.CustomerRegistrationStartDate)
+                    .FirstOrDefaultAsync();
+
+                if (registration == null)
+                {
+                    return new ApiResponse("Error", "Üyelik kaydı bulunamadı.", null);
+                }
+
+                // Kalan gün hesapla
+                int remainingDays = 0;
+                string membershipStatus = "Aktif";
+                
+                if (registration.CustomerRegistrationFinishDate.HasValue)
+                {
+                    var finishDate = registration.CustomerRegistrationFinishDate.Value.Date;
+                    var today = DateTime.Now.Date;
+                    var daysDifference = (finishDate - today).Days;
+
+                    if (daysDifference > 0)
+                    {
+                        remainingDays = daysDifference;
+                        membershipStatus = "Aktif";
+                    }
+                    else if (daysDifference == 0)
+                    {
+                        remainingDays = 0;
+                        membershipStatus = "Bugün Bitiyor";
+                    }
+                    else
+                    {
+                        remainingDays = 0;
+                        membershipStatus = "Süresi Dolmuş";
+                    }
+                }
+
+                // Üyelik süresini hesapla (ay cinsinden)
+                int membershipDurationMonths = 0;
+                if (registration.CustomerRegistrationStartDate.HasValue && 
+                    registration.CustomerRegistrationFinishDate.HasValue)
+                {
+                    var startDate = registration.CustomerRegistrationStartDate.Value;
+                    var finishDate = registration.CustomerRegistrationFinishDate.Value;
+                    membershipDurationMonths = ((finishDate.Year - startDate.Year) * 12) + 
+                                              (finishDate.Month - startDate.Month);
+                }
+
+                var membershipInfo = new
+                {
+                    CustomerId = userId,
+                    StartDate = registration.CustomerRegistrationStartDate?.ToString("yyyy-MM-dd"),
+                    FinishDate = registration.CustomerRegistrationFinishDate?.ToString("yyyy-MM-dd"),
+                    RemainingDays = remainingDays,
+                    MembershipStatus = membershipStatus,
+                    MembershipDurationMonths = membershipDurationMonths,
+                    IsActive = remainingDays > 0 || membershipStatus == "Bugün Bitiyor"
+                };
+
+                return new ApiResponse("Success", "Üyelik bilgileri başarıyla getirildi.", membershipInfo);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        [HttpPost]
+        [Route("ChangePassword")]
+        [Authorize(Roles = "Customer")]
+        public async Task<ApiResponse> ChangePassword(ChangePasswordRequest model)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+                
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", $"Kullanıcı bilgisi bulunamadı.", null);
+                }
+
+                var customer = await _dbContext.Customers.FirstOrDefaultAsync(x => x.UserId == userId);
+
+                if (customer == null)
+                {
+                    return new ApiResponse("Error", $"Müşteri bulunamadı.", null);
+                }
+
+                // Mevcut şifre kontrolü
+                var currentPasswordHash = NulidGenarator.GenerateSHA512String(model.CurrentPassword);
+                if (customer.UserPassword != currentPasswordHash)
+                {
+                    return new ApiResponse("Error", $"Mevcut şifre hatalı.", null);
+                }
+
+                // Yeni şifre ve onay şifresi eşleşiyor mu?
+                if (model.NewPassword != model.ConfirmPassword)
+                {
+                    return new ApiResponse("Error", $"Yeni şifre ve onay şifresi eşleşmiyor.", null);
+                }
+
+                // Şifre validasyonu
+                var (isValid, errorMessage) = CustomerService.ValidatePassword(model.NewPassword);
+                if (!isValid)
+                {
+                    return new ApiResponse("Error", errorMessage ?? "Şifre geçersiz.", null);
+                }
+
+                // Yeni şifreyi hash'le ve kaydet
+                var newPasswordHash = NulidGenarator.GenerateSHA512String(model.NewPassword);
+                customer.UserPassword = newPasswordHash;
+                customer.IsPasswordChanged = true; // Şifre değiştirildi olarak işaretle
+
+                _dbContext.Customers.Update(customer);
+                await _dbContext.SaveChangesAsync();
+
+                return new ApiResponse("Success", $"Şifre başarıyla değiştirildi.", null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
         }
     }
 }

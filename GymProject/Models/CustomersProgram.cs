@@ -6,11 +6,19 @@ public partial class CustomersProgram
 
     public string? CustomerId { get; set; }
 
-    public string? MovementName { get; set; }
+    public string? MovementId { get; set; } // Backward compatibility için
 
-    public int? SetCount { get; set; }
+    public string? MovementName { get; set; } // Backward compatibility için
 
-    public int? Reps { get; set; }
+    public string? ProgramName { get; set; }
+
+    public string? CreatedByUserId { get; set; }
+
+    public string? CreatedByName { get; set; }
+
+    public int? SetCount { get; set; } // Backward compatibility için
+
+    public int? Reps { get; set; } // Backward compatibility için
 
     public DateTime? ProgramStartDate { get; set; }
 

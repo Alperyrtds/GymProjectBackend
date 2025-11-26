@@ -69,7 +69,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<AlperyurtdasGymProjectContext>(options =>
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("GymTracking"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("GymTracking"));
 });
 DependencyInjection.Configure(builder.Services);
 var app = builder.Build();

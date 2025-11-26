@@ -1,9 +1,10 @@
 ﻿using FluentValidation;
 using GymProject.Models;
+using GymProject.Models.Requests;
 
 namespace GymProject.Validators.CustomersValidators
 {
-    public class CustomerAddValidator : AbstractValidator<Customer>
+    public class CustomerAddValidator : AbstractValidator<AddCustomerRequest>
     {
         public CustomerAddValidator()
         {
@@ -26,6 +27,9 @@ namespace GymProject.Validators.CustomersValidators
             RuleFor(x => x.CustomerPhoneNumber)
                 .NotEmpty().WithMessage("Telefon numarası boş bırakılamaz.")
                 .Matches(@"^\+(?:[0-9] ?){6,14}[0-9]$").WithMessage("Geçerli bir telefon numarası giriniz.");
+
+            RuleFor(x => x.CustomerRegistryDateLong)
+                .NotEmpty().WithMessage("Üyelik süresi boş bırakılamaz.");
         }
     }
 }

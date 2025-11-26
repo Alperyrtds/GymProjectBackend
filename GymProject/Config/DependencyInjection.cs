@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using GymProject.Models;
+using GymProject.Models.Requests;
 using GymProject.Validators.CustomersValidators;
 
 namespace GymProject.Config
@@ -9,7 +10,7 @@ namespace GymProject.Config
         public static void Configure(IServiceCollection services)
         {
             // Dependency Injection ile sınıfları kaydedin
-            services.AddScoped<IValidator<Customer>, CustomerAddValidator>();
+            services.AddScoped<IValidator<AddCustomerRequest>, CustomerAddValidator>();
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using FluentValidation;
 using System.Text.RegularExpressions;
-using StockTracking.Model;
+using GymProject.Models;
 
 namespace GymProject.Validators
 {

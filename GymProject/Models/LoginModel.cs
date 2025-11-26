@@ -1,4 +1,4 @@
-﻿namespace StockTracking.Model
+﻿namespace GymProject.Models
 {
     public class LoginModel
     {
