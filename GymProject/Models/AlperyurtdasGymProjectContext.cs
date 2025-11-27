@@ -35,6 +35,8 @@ public partial class AlperyurtdasGymProjectContext : DbContext
 
     public virtual DbSet<Goal> Goals { get; set; }
 
+    public virtual DbSet<ContactMessage> ContactMessages { get; set; }
+
     // Connection string is configured in Program.cs via dependency injection
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -273,6 +275,21 @@ public partial class AlperyurtdasGymProjectContext : DbContext
                 .HasForeignKey(e => e.TrainerId)
                 .HasPrincipalKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ContactMessage>(entity =>
+        {
+            entity.HasKey(e => e.ContactMessageId).HasName("PK_ContactMessage");
+
+            entity.ToTable("ContactMessages");
+
+            entity.Property(e => e.ContactMessageId).HasMaxLength(30);
+            entity.Property(e => e.FullName).HasMaxLength(100);
+            entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+            entity.Property(e => e.Message).HasMaxLength(2000);
+            entity.Property(e => e.CreatedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.IsRead).HasDefaultValue(false);
         });
 
         OnModelCreatingPartial(modelBuilder);

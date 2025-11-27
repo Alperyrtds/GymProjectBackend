@@ -11,7 +11,6 @@ namespace GymProject.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
     public class TrainerController : ControllerBase
     {
         private readonly AlperyurtdasGymProjectContext _dbContext;
@@ -26,6 +25,7 @@ namespace GymProject.Controllers
         /// </summary>
         [HttpPost]
         [Route("AddTrainer")]
+        [Authorize(Roles = "Admin")]
         public async Task<ApiResponse> AddTrainer([FromBody] TrainerRequest model)
         {
             try
@@ -96,6 +96,7 @@ namespace GymProject.Controllers
         /// </summary>
         [HttpGet]
         [Route("GetAllTrainers")]
+        [Authorize(Roles = "Admin")]
         public async Task<ApiResponse> GetAllTrainers()
         {
             try
@@ -119,10 +120,16 @@ namespace GymProject.Controllers
         /// </summary>
         [HttpPost]
         [Route("GetTrainerById")]
-        public async Task<ApiResponse> GetTrainerById([FromBody] TrainerRequest request)
+        [Authorize(Roles = "Admin,Trainer")]
+        public async Task<ApiResponse> GetTrainerById([FromBody] GetTrainerByIdRequest request)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(request.UserId))
+                {
+                    return new ApiResponse("Error", "Trainer ID boş olamaz.", null);
+                }
+
                 var trainer = await _dbContext.Trainers
                     .FirstOrDefaultAsync(x => x.UserId == request.UserId);
 
@@ -145,6 +152,7 @@ namespace GymProject.Controllers
         /// </summary>
         [HttpPost]
         [Route("UpdateTrainer")]
+        [Authorize(Roles = "Admin,Trainer")]
         public async Task<ApiResponse> UpdateTrainer(TrainerRequest model)
         {
             try
@@ -205,6 +213,7 @@ namespace GymProject.Controllers
         /// </summary>
         [HttpPost]
         [Route("DeleteTrainer")]
+        [Authorize(Roles = "Admin")]
         public async Task<ApiResponse> DeleteTrainer([FromBody] TrainerRequest request)
         {
             try

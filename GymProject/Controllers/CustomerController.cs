@@ -150,7 +150,7 @@ namespace GymProject.Controllers
                             item.CustomerRegistryEndDate = registery.CustomerRegistrationFinishDate.Value;
 
                             // Kaç gün kaldığını hesapla
-                            var today = registery.CustomerRegistrationStartDate.Value.Date;
+                            var today = DateTime.Now.Date;
                             var finishDate = registery.CustomerRegistrationFinishDate.Value.Date;
                             var remainDate = (finishDate - today).Days;
                             if (remainDate < 0) remainDate = 0; // Eğer süresi dolmuşsa 0

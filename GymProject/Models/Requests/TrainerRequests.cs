@@ -19,3 +19,8 @@ public class TrainerRequest
     public string? TrainerEmail { get; set; } // Add işlemi için email (userName olarak kullanılacak)
 }
 
+public class GetTrainerByIdRequest
+{
+    public string UserId { get; set; } = null!;
+}
+

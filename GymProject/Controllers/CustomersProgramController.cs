@@ -775,6 +775,144 @@ namespace GymProject.Controllers
             }
         }
 
+        /// <summary>
+        /// Tüm antrenörlerin yazdığı programları getirir (Admin ve Trainer için)
+        /// </summary>
+        [HttpGet]
+        [Route("GetTrainerPrograms")]
+        [Authorize(Roles = "Admin,Trainer")]
+        public async Task<ApiResponse> GetTrainerPrograms()
+        {
+            try
+            {
+                // Tüm antrenörlerin UserId'lerini al
+                var trainerUserIds = await _dbContext.Trainers
+                    .Select(t => t.UserId)
+                    .ToListAsync();
+
+                // Antrenörlerin yazdığı programları getir
+                var programs = await _dbContext.CustomersPrograms
+                    .Where(p => p.CreatedByUserId != null && trainerUserIds.Contains(p.CreatedByUserId))
+                    .OrderByDescending(x => x.ProgramStartDate)
+                    .ToListAsync();
+
+                // Program detaylarını hazırla
+                var programsWithDetails = programs.Select(p =>
+                {
+                    // Program'a ait hareketleri getir
+                    var movements = _dbContext.ProgramMovements
+                        .Where(pm => pm.CustomerProgramId == p.CustomerProgramId)
+                        .Select(pm => new
+                        {
+                            pm.ProgramMovementId,
+                            pm.MovementId,
+                            pm.MovementName,
+                            pm.SetCount,
+                            pm.Reps
+                        })
+                        .ToList();
+
+                    // Müşteri bilgilerini getir
+                    var customer = _dbContext.Customers
+                        .FirstOrDefault(c => c.UserId == p.CustomerId);
+
+                    return new
+                    {
+                        p.CustomerProgramId,
+                        p.CustomerId,
+                        CustomerName = customer != null ? $"{customer.CustomerName} {customer.CustomerSurname}" : "Bilinmiyor",
+                        CustomerEmail = customer?.CustomerEmail ?? "",
+                        p.ProgramName,
+                        p.CreatedByUserId,
+                        p.CreatedByName,
+                        p.ProgramStartDate,
+                        p.ProgramEndDate,
+                        p.LeftValidity,
+                        MovementCount = movements.Count,
+                        Movements = movements
+                    };
+                }).ToList();
+
+                return new ApiResponse("Success", "Antrenör programları başarıyla getirildi.", programsWithDetails);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Belirli bir antrenörün yazdığı programları getirir (Admin ve Trainer için)
+        /// </summary>
+        [HttpPost]
+        [Route("GetProgramsByTrainer")]
+        [Authorize(Roles = "Admin,Trainer")]
+        public async Task<ApiResponse> GetProgramsByTrainer([FromBody] CustomerRequest request)
+        {
+            try
+            {
+                // Antrenör var mı kontrol et
+                var trainer = await _dbContext.Trainers
+                    .FirstOrDefaultAsync(t => t.UserId == request.UserId);
+
+                if (trainer == null)
+                {
+                    return new ApiResponse("Error", "Antrenör bulunamadı.", null);
+                }
+
+                // Bu antrenörün yazdığı programları getir
+                var programs = await _dbContext.CustomersPrograms
+                    .Where(p => p.CreatedByUserId == request.UserId)
+                    .OrderByDescending(x => x.ProgramStartDate)
+                    .ToListAsync();
+
+                // Program detaylarını hazırla
+                var programsWithDetails = programs.Select(p =>
+                {
+                    // Program'a ait hareketleri getir
+                    var movements = _dbContext.ProgramMovements
+                        .Where(pm => pm.CustomerProgramId == p.CustomerProgramId)
+                        .Select(pm => new
+                        {
+                            pm.ProgramMovementId,
+                            pm.MovementId,
+                            pm.MovementName,
+                            pm.SetCount,
+                            pm.Reps
+                        })
+                        .ToList();
+
+                    // Müşteri bilgilerini getir
+                    var customer = _dbContext.Customers
+                        .FirstOrDefault(c => c.UserId == p.CustomerId);
+
+                    return new
+                    {
+                        p.CustomerProgramId,
+                        p.CustomerId,
+                        CustomerName = customer != null ? $"{customer.CustomerName} {customer.CustomerSurname}" : "Bilinmiyor",
+                        CustomerEmail = customer?.CustomerEmail ?? "",
+                        p.ProgramName,
+                        p.CreatedByUserId,
+                        p.CreatedByName,
+                        p.ProgramStartDate,
+                        p.ProgramEndDate,
+                        p.LeftValidity,
+                        MovementCount = movements.Count,
+                        Movements = movements
+                    };
+                }).ToList();
+
+                return new ApiResponse("Success", "Antrenör programları başarıyla getirildi.", programsWithDetails);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
     }
 }
 
