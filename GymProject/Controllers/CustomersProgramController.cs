@@ -5,6 +5,7 @@ using GymProject.Models.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GymProject.Controllers
 {
@@ -14,10 +15,14 @@ namespace GymProject.Controllers
     public class CustomersProgramController : ControllerBase
     {
         private readonly AlperyurtdasGymProjectContext _dbContext;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
-        public CustomersProgramController(AlperyurtdasGymProjectContext dbContext)
+        public CustomersProgramController(
+            AlperyurtdasGymProjectContext dbContext,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _dbContext = dbContext;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         /// <summary>
@@ -71,7 +76,7 @@ namespace GymProject.Controllers
                     var programEndDate = model.ProgramEndDate.HasValue
                         ? DateTime.SpecifyKind(model.ProgramEndDate.Value, DateTimeKind.Unspecified)
                         : (DateTime?)null;
-                    
+
                     var program = new CustomersProgram
                     {
                         CustomerProgramId = NulidGenarator.Id(),
@@ -98,7 +103,7 @@ namespace GymProject.Controllers
                         {
                             var movement = await _dbContext.Movements
                                 .FirstOrDefaultAsync(x => x.MovementId == movementItem.MovementId);
-                            
+
                             if (movement != null)
                             {
                                 movementName = movement.MovementName;
@@ -130,6 +135,33 @@ namespace GymProject.Controllers
 
                     await transaction.CommitAsync();
 
+                    // ✅ PUSH NOTIFICATION GÖNDER (asenkron, hata olsa bile program oluşturma işlemi etkilenmez)
+                    // Yeni bir scope oluştur çünkü Task.Run içinde DbContext dispose edilmiş olabilir
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _serviceScopeFactory.CreateScope();
+                        try
+                        {
+                            var pushTokenService = scope.ServiceProvider.GetRequiredService<Services.PushTokenService>();
+                            var pushNotificationService = scope.ServiceProvider.GetRequiredService<Services.PushNotificationService>();
+
+                            Console.WriteLine($"[PUSH] Program oluşturuldu, notification gönderiliyor. CustomerId: {model.CustomerId}, ProgramId: {program.CustomerProgramId}");
+                            await pushNotificationService.SendProgramNotificationAsync(
+                                model.CustomerId,
+                                program.ProgramName ?? "Yeni Program",
+                                program.CustomerProgramId,
+                                pushTokenService,
+                                pushNotificationService
+                            );
+                            Console.WriteLine($"[PUSH] Notification gönderme işlemi tamamlandı.");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[PUSH ERROR] Push notification gönderilirken hata: {ex.Message}");
+                            Console.WriteLine($"[PUSH ERROR] StackTrace: {ex.StackTrace}");
+                        }
+                    });
+
                     // Response'da program ve hareketleri döndür
                     var response = new
                     {
@@ -155,7 +187,7 @@ namespace GymProject.Controllers
                     {
                         var movement = await _dbContext.Movements
                             .FirstOrDefaultAsync(x => x.MovementId == model.MovementId);
-                        
+
                         if (movement != null)
                         {
                             movementName = movement.MovementName;
@@ -245,7 +277,7 @@ namespace GymProject.Controllers
                     var programEndDate = model.ProgramEndDate.HasValue
                         ? DateTime.SpecifyKind(model.ProgramEndDate.Value, DateTimeKind.Unspecified)
                         : (DateTime?)null;
-                    
+
                     var program = new CustomersProgram
                     {
                         CustomerProgramId = NulidGenarator.Id(),
@@ -272,7 +304,7 @@ namespace GymProject.Controllers
                         {
                             var movement = await _dbContext.Movements
                                 .FirstOrDefaultAsync(x => x.MovementId == movementItem.MovementId);
-                            
+
                             if (movement != null)
                             {
                                 movementName = movement.MovementName;
@@ -304,6 +336,33 @@ namespace GymProject.Controllers
 
                     await transaction.CommitAsync();
 
+                    // ✅ PUSH NOTIFICATION GÖNDER (asenkron, hata olsa bile program oluşturma işlemi etkilenmez)
+                    // Yeni bir scope oluştur çünkü Task.Run içinde DbContext dispose edilmiş olabilir
+                    //_ = Task.Run(async () =>
+                    //{
+                    //    using var scope = _serviceScopeFactory.CreateScope();
+                    //    try
+                    //    {
+                    //        var pushTokenService = scope.ServiceProvider.GetRequiredService<Services.PushTokenService>();
+                    //        var pushNotificationService = scope.ServiceProvider.GetRequiredService<Services.PushNotificationService>();
+
+                    //        Console.WriteLine($"[PUSH] Program oluşturuldu, notification gönderiliyor. CustomerId: {model.CustomerId}, ProgramId: {program.CustomerProgramId}");
+                    //        await pushNotificationService.SendProgramNotificationAsync(
+                    //            model.CustomerId,
+                    //            program.ProgramName ?? "Yeni Program",
+                    //            program.CustomerProgramId,
+                    //            pushTokenService,
+                    //            pushNotificationService
+                    //        );
+                    //        Console.WriteLine($"[PUSH] Notification gönderme işlemi tamamlandı.");
+                    //    }
+                    //    catch (Exception ex)
+                    //    {
+                    //        Console.WriteLine($"[PUSH ERROR] Push notification gönderilirken hata: {ex.Message}");
+                    //        Console.WriteLine($"[PUSH ERROR] StackTrace: {ex.StackTrace}");
+                    //    }
+                    //});
+
                     // Response'da program ve hareketleri döndür
                     var response = new
                     {
@@ -329,7 +388,7 @@ namespace GymProject.Controllers
                     {
                         var movement = await _dbContext.Movements
                             .FirstOrDefaultAsync(x => x.MovementId == model.MovementId);
-                        
+
                         if (movement != null)
                         {
                             movementName = movement.MovementName;
@@ -402,13 +461,13 @@ namespace GymProject.Controllers
                 // Movement bilgilerini ekle
                 var programsWithDetails = programs.Select(p =>
                 {
-                    
+
                     ProgramMovement? movement = null;
                     if (!string.IsNullOrEmpty(p.MovementId))
                     {
                         movement = _dbContext.ProgramMovements.FirstOrDefault(m => m.CustomerProgramId == p.CustomerProgramId);
                     }
-                    
+
                     return new
                     {
                         p.CustomerProgramId,
@@ -475,7 +534,7 @@ namespace GymProject.Controllers
                     .ToListAsync();
 
                 object movements;
-                
+
                 if (movementsDb.Count > 0)
                 {
                     movements = movementsDb.Select(pm => new
@@ -494,7 +553,7 @@ namespace GymProject.Controllers
                     // Eski yöntemle (backward compatibility)
                     Movement? movement = await _dbContext.Movements
                         .FirstOrDefaultAsync(m => m.MovementId == program.MovementId);
-                    
+
                     movements = new List<object>
                     {
                         new
@@ -577,7 +636,7 @@ namespace GymProject.Controllers
                         .ToList();
 
                     object movements;
-                    
+
                     if (movementsDb.Count > 0)
                     {
                         movements = movementsDb.Select(pm => new
@@ -610,21 +669,21 @@ namespace GymProject.Controllers
                     {
                         movements = new List<object>();
                     }
-                    
-                // MovementCount hesapla
-                int movementCount = 0;
-                if (movements is List<object> objList)
-                {
-                    movementCount = objList.Count;
-                }
-                else if (movements is System.Collections.IEnumerable enumerable)
-                {
-                    movementCount = enumerable.Cast<object>().Count();
-                }
-                else if (movementsDb != null)
-                {
-                    movementCount = movementsDb.Count;
-                }
+
+                    // MovementCount hesapla
+                    int movementCount = 0;
+                    if (movements is List<object> objList)
+                    {
+                        movementCount = objList.Count;
+                    }
+                    else if (movements is System.Collections.IEnumerable enumerable)
+                    {
+                        movementCount = enumerable.Cast<object>().Count();
+                    }
+                    else if (movementsDb != null)
+                    {
+                        movementCount = movementsDb.Count;
+                    }
 
                     return new
                     {
@@ -686,7 +745,7 @@ namespace GymProject.Controllers
                     var existingMovements = await _dbContext.ProgramMovements
                         .Where(pm => pm.CustomerProgramId == program.CustomerProgramId)
                         .ToListAsync();
-                    
+
                     _dbContext.ProgramMovements.RemoveRange(existingMovements);
                     await _dbContext.SaveChangesAsync();
 
@@ -701,7 +760,7 @@ namespace GymProject.Controllers
                         {
                             var movement = await _dbContext.Movements
                                 .FirstOrDefaultAsync(x => x.MovementId == movementItem.MovementId);
-                            
+
                             if (movement != null)
                             {
                                 movementName = movement.MovementName;
@@ -912,6 +971,9 @@ namespace GymProject.Controllers
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
         }
+
+        // Push notification gönderme metodu
+
 
     }
 }

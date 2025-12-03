@@ -37,6 +37,12 @@ public partial class AlperyurtdasGymProjectContext : DbContext
 
     public virtual DbSet<ContactMessage> ContactMessages { get; set; }
 
+    public virtual DbSet<PushToken> PushTokens { get; set; }
+
+    public virtual DbSet<PricingPlan> PricingPlans { get; set; }
+
+    public virtual DbSet<PricingPlanFeature> PricingPlanFeatures { get; set; }
+
     // Connection string is configured in Program.cs via dependency injection
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -232,6 +238,7 @@ public partial class AlperyurtdasGymProjectContext : DbContext
 
             entity.Property(e => e.CustomerRegistrationId).HasMaxLength(30);
             entity.Property(e => e.CustomerId).HasMaxLength(30);
+            entity.Property(e => e.PricingPlanId).HasMaxLength(30);
             entity.Property(e => e.CustomerRegistrationFinishDate).HasColumnType("timestamp without time zone");
             entity.Property(e => e.CustomerRegistrationStartDate).HasColumnType("timestamp without time zone");
             
@@ -241,6 +248,13 @@ public partial class AlperyurtdasGymProjectContext : DbContext
                 .HasForeignKey(e => e.CustomerId)
                 .HasPrincipalKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+            
+            // Foreign key to PricingPlan (optional)
+            entity.HasOne<PricingPlan>()
+                .WithMany()
+                .HasForeignKey(e => e.PricingPlanId)
+                .HasPrincipalKey(p => p.PricingPlanId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Goal>(entity =>
@@ -290,6 +304,65 @@ public partial class AlperyurtdasGymProjectContext : DbContext
             entity.Property(e => e.Message).HasMaxLength(2000);
             entity.Property(e => e.CreatedDate).HasColumnType("timestamp without time zone");
             entity.Property(e => e.IsRead).HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<PushToken>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_PushToken");
+
+            entity.ToTable("PushTokens");
+
+            entity.Property(e => e.Id).HasMaxLength(450);
+            entity.Property(e => e.CustomerId).HasMaxLength(30);
+            entity.Property(e => e.Token).HasMaxLength(500);
+            entity.Property(e => e.Platform).HasMaxLength(50);
+            entity.Property(e => e.CreatedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.UpdatedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            // Foreign key to Customer
+            entity.HasOne<Customer>()
+                .WithMany()
+                .HasForeignKey(e => e.CustomerId)
+                .HasPrincipalKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PricingPlan>(entity =>
+        {
+            entity.HasKey(e => e.PricingPlanId).HasName("PK_PricingPlan");
+
+            entity.ToTable("PricingPlans");
+
+            entity.Property(e => e.PricingPlanId).HasMaxLength(30);
+            entity.Property(e => e.PlanName).HasMaxLength(100);
+            entity.Property(e => e.Price).HasColumnType("numeric(10,2)");
+            entity.Property(e => e.IsPopular).HasDefaultValue(false);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
+            entity.Property(e => e.Language).HasMaxLength(10).HasDefaultValue("tr");
+            entity.Property(e => e.OriginalLanguage).HasMaxLength(10);
+            entity.Property(e => e.CreatedDate).HasColumnType("timestamp without time zone");
+            entity.Property(e => e.UpdatedDate).HasColumnType("timestamp without time zone");
+        });
+
+        modelBuilder.Entity<PricingPlanFeature>(entity =>
+        {
+            entity.HasKey(e => e.PricingPlanFeatureId).HasName("PK_PricingPlanFeature");
+
+            entity.ToTable("PricingPlanFeatures");
+
+            entity.Property(e => e.PricingPlanFeatureId).HasMaxLength(30);
+            entity.Property(e => e.PricingPlanId).HasMaxLength(30);
+            entity.Property(e => e.FeatureText).HasMaxLength(500);
+            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
+
+            // Foreign key to PricingPlan
+            entity.HasOne<PricingPlan>()
+                .WithMany(p => p.Features)
+                .HasForeignKey(e => e.PricingPlanId)
+                .HasPrincipalKey(p => p.PricingPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         OnModelCreatingPartial(modelBuilder);

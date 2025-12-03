@@ -21,6 +21,70 @@ namespace GymProject.Controllers
         }
 
         /// <summary>
+        /// YouTube URL'den video ID'yi çıkarır (normal video, shorts, youtu.be formatlarını destekler)
+        /// </summary>
+        private string? ExtractYouTubeVideoId(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return null;
+
+            try
+            {
+                // Eğer zaten embed URL ise direkt video ID'yi al
+                if (url.Contains("/embed/"))
+                {
+                    var embedIndex = url.IndexOf("/embed/");
+                    var videoId = url.Substring(embedIndex + 7);
+                    // Query string varsa temizle
+                    var queryIndex = videoId.IndexOf('?');
+                    if (queryIndex > 0)
+                        videoId = videoId.Substring(0, queryIndex);
+                    return videoId;
+                }
+
+                var uri = new Uri(url);
+
+                // YouTube Shorts formatı: https://www.youtube.com/shorts/VIDEO_ID
+                if (uri.AbsolutePath.StartsWith("/shorts/"))
+                {
+                    var videoId = uri.AbsolutePath.Substring(8); // "/shorts/" kısmını atla
+                    // Query string varsa temizle
+                    var queryIndex = videoId.IndexOf('?');
+                    if (queryIndex > 0)
+                        videoId = videoId.Substring(0, queryIndex);
+                    return videoId;
+                }
+
+                // youtu.be formatı: https://youtu.be/VIDEO_ID
+                if (uri.Host.Contains("youtu.be"))
+                {
+                    var videoId = uri.AbsolutePath.TrimStart('/');
+                    // Query string varsa temizle
+                    var queryIndex = videoId.IndexOf('?');
+                    if (queryIndex > 0)
+                        videoId = videoId.Substring(0, queryIndex);
+                    return videoId;
+                }
+
+                // Normal YouTube formatı: https://www.youtube.com/watch?v=VIDEO_ID
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var vParam = query["v"];
+                
+                if (!string.IsNullOrEmpty(vParam))
+                {
+                    return vParam;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"YouTube video ID çıkarılırken hata: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Admin veya Trainer hareket ekleyebilir
         /// </summary>
         [HttpPost]
@@ -37,17 +101,12 @@ namespace GymProject.Controllers
 
                 var originalUrl = model.MovementVideoUrl;
 
-                // VIDEO_ID'yi yakala
-                string videoId = null;
-
-                // Query string'ten v parametresini al
-                var uri = new Uri(originalUrl);
-                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-                videoId = query["v"];
+                // VIDEO_ID'yi yakala (normal video, shorts, youtu.be formatlarını destekler)
+                var videoId = ExtractYouTubeVideoId(originalUrl);
 
                 if (string.IsNullOrEmpty(videoId))
                 {
-                    return new ApiResponse("Error", "Geçersiz YouTube linki.", null);
+                    return new ApiResponse("Error", "Geçersiz YouTube linki. Normal video, Shorts veya youtu.be formatında olmalıdır.", null);
                 }
 
                 // Embed URL oluştur
@@ -172,9 +231,28 @@ namespace GymProject.Controllers
                     return new ApiResponse("Error", "Hareket adı boş olamaz.", null);
                 }
 
+                if (string.IsNullOrWhiteSpace(model.MovementVideoUrl))
+                {
+                    return new ApiResponse("Error", "Video url boş olamaz.", null);
+                }
+
+
+                var originalUrl = model.MovementVideoUrl;
+
+                // VIDEO_ID'yi yakala (normal video, shorts, youtu.be formatlarını destekler)
+                var videoId = ExtractYouTubeVideoId(originalUrl);
+
+                if (string.IsNullOrEmpty(videoId))
+                {
+                    return new ApiResponse("Error", "Geçersiz YouTube linki. Normal video, Shorts veya youtu.be formatında olmalıdır.", null);
+                }
+
+                // Embed URL oluştur
+                var embedVideoUrl = $"https://www.youtube.com/embed/{videoId}";
+
                 movement.MovementName = model.MovementName;
                 movement.MovementDescription = model.MovementDescription;
-                movement.MovementVideoUrl = model.MovementVideoUrl;
+                movement.MovementVideoUrl = embedVideoUrl;
 
                 _dbContext.Movements.Update(movement);
                 await _dbContext.SaveChangesAsync();

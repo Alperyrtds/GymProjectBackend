@@ -3,6 +3,7 @@ using System;
 using GymProject.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GymProject.Migrations
 {
     [DbContext(typeof(AlperyurtdasGymProjectContext))]
-    partial class AlperyurtdasGymProjectContextModelSnapshot : ModelSnapshot
+    [Migration("20251201134655_AddPushTokenTable")]
+    partial class AddPushTokenTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -149,16 +152,10 @@ namespace GymProject.Migrations
                     b.Property<DateTime?>("CustomerRegistrationStartDate")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<string>("PricingPlanId")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
                     b.HasKey("CustomerRegistrationId")
                         .HasName("PK_CustomerRegistratiom");
 
                     b.HasIndex("CustomerId");
-
-                    b.HasIndex("PricingPlanId");
 
                     b.ToTable("Customers_Registration", (string)null);
                 });
@@ -241,95 +238,6 @@ namespace GymProject.Migrations
                         .HasName("PK_Movement");
 
                     b.ToTable("Movements", (string)null);
-                });
-
-            modelBuilder.Entity("GymProject.Models.PricingPlan", b =>
-                {
-                    b.Property<string>("PricingPlanId")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<DateTime>("CreatedDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<int>("DisplayOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<int>("DurationInMonths")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
-
-                    b.Property<bool>("IsPopular")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasDefaultValue("tr");
-
-                    b.Property<string>("OriginalLanguage")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("PlanName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric(10,2)");
-
-                    b.Property<DateTime?>("UpdatedDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.HasKey("PricingPlanId")
-                        .HasName("PK_PricingPlan");
-
-                    b.ToTable("PricingPlans", (string)null);
-                });
-
-            modelBuilder.Entity("GymProject.Models.PricingPlanFeature", b =>
-                {
-                    b.Property<string>("PricingPlanFeatureId")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<int>("DisplayOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
-
-                    b.Property<string>("FeatureText")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("PricingPlanId")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("PricingPlanId1")
-                        .HasColumnType("character varying(30)");
-
-                    b.HasKey("PricingPlanFeatureId")
-                        .HasName("PK_PricingPlanFeature");
-
-                    b.HasIndex("PricingPlanId");
-
-                    b.HasIndex("PricingPlanId1");
-
-                    b.ToTable("PricingPlanFeatures", (string)null);
                 });
 
             modelBuilder.Entity("GymProject.Models.ProgramMovement", b =>
@@ -600,11 +508,6 @@ namespace GymProject.Migrations
                         .WithMany()
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("GymProject.Models.PricingPlan", null)
-                        .WithMany()
-                        .HasForeignKey("PricingPlanId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("GymProject.Models.Goal", b =>
@@ -618,21 +521,6 @@ namespace GymProject.Migrations
                         .WithMany()
                         .HasForeignKey("TrainerId")
                         .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("GymProject.Models.PricingPlanFeature", b =>
-                {
-                    b.HasOne("GymProject.Models.PricingPlan", null)
-                        .WithMany("Features")
-                        .HasForeignKey("PricingPlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GymProject.Models.PricingPlan", "PricingPlan")
-                        .WithMany()
-                        .HasForeignKey("PricingPlanId1");
-
-                    b.Navigation("PricingPlan");
                 });
 
             modelBuilder.Entity("GymProject.Models.ProgramMovement", b =>
@@ -718,11 +606,6 @@ namespace GymProject.Migrations
                         .HasForeignKey("GymProject.Models.Trainer", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("GymProject.Models.PricingPlan", b =>
-                {
-                    b.Navigation("Features");
                 });
 #pragma warning restore 612, 618
         }

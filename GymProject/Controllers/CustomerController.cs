@@ -18,9 +18,12 @@ namespace GymProject.Controllers
     public class CustomerController : ControllerBase
     {
         private AlperyurtdasGymProjectContext _dbContext;
-        public CustomerController(AlperyurtdasGymProjectContext dbContext)
+        private readonly Services.PushTokenService _pushTokenService;
+
+        public CustomerController(AlperyurtdasGymProjectContext dbContext, Services.PushTokenService pushTokenService)
         {
             _dbContext = dbContext;
+            _pushTokenService = pushTokenService;
         }
 
         [HttpPost]
@@ -549,6 +552,117 @@ namespace GymProject.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Push notification token kaydet (mobil uygulama için)
+        /// </summary>
+        [HttpPost]
+        [Route("RegisterPushToken")]
+        public async Task<ApiResponse> RegisterPushToken([FromBody] RegisterPushTokenRequest request)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.Sid);
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bulunamadı.", null);
+                }
+
+                if (string.IsNullOrWhiteSpace(request.PushToken))
+                {
+                    return new ApiResponse("Error", "Push token boş olamaz.", null);
+                }
+
+                var result = await _pushTokenService.RegisterPushTokenAsync(
+                    userId,
+                    request.PushToken,
+                    request.Platform ?? "expo"
+                );
+
+                if (result)
+                {
+                    return new ApiResponse("Success", "Push token başarıyla kaydedildi.", null);
+                }
+
+                return new ApiResponse("Error", "Push token kaydedilemedi.", null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"RegisterPushToken hatası: {ex.Message}");
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Push notification token sil (logout veya token geçersiz olduğunda)
+        /// </summary>
+        [HttpPost]
+        [Route("UnregisterPushToken")]
+        public async Task<ApiResponse> UnregisterPushToken([FromBody] UnregisterPushTokenRequest? request = null)
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bulunamadı.", null);
+                }
+
+                var result = await _pushTokenService.UnregisterPushTokenAsync(
+                    userId,
+                    request?.PushToken
+                );
+
+                if (result)
+                {
+                    return new ApiResponse("Success", "Push token başarıyla silindi.", null);
+                }
+
+                return new ApiResponse("Error", "Push token silinemedi.", null);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"UnregisterPushToken hatası: {ex.Message}");
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Kullanıcının kayıtlı push token'larını kontrol et (test için)
+        /// </summary>
+        [HttpGet]
+        [Route("GetMyPushTokens")]
+        public async Task<ApiResponse> GetMyPushTokens()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bulunamadı.", null);
+                }
+
+                var tokens = await _pushTokenService.GetActivePushTokensAsync(userId);
+
+                return new ApiResponse("Success", $"Bulunan aktif token sayısı: {tokens.Count}", new
+                {
+                    TokenCount = tokens.Count,
+                    Tokens = tokens.Select(t => new
+                    {
+                        Token = t.Substring(0, Math.Min(20, t.Length)) + "...", // İlk 20 karakteri göster
+                        FullToken = t
+                    }).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GetMyPushTokens hatası: {ex.Message}");
                 return new ApiResponse("Error", $"Hata = {ex.Message}", null);
             }
         }

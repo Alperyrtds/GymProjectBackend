@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using XLocalizer.Translate.MyMemoryTranslate;
+using XLocalizer.Translate;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,20 +59,46 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("Policy",
+    options.AddPolicy("AllowAll",
         policy =>
         {
-            policy.SetIsOriginAllowed(origin => true);
-            policy.AllowAnyOrigin();
-            policy.AllowAnyHeader();
-            policy.AllowAnyMethod();
+            // Tüm origin'lere izin ver (React web için)
+            policy.SetIsOriginAllowed(origin => 
+            {
+                // Localhost ve tüm IP adreslerine izin ver
+                return true;
+            })
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); // JWT token için credentials gerekli
         });
+    
+    // Production için belirli origin'lere izin vermek isterseniz:
+    // options.AddPolicy("Production",
+    //     policy =>
+    //     {
+    //         policy.WithOrigins("https://yourdomain.com", "https://www.yourdomain.com")
+    //               .AllowAnyHeader()
+    //               .AllowAnyMethod()
+    //               .AllowCredentials();
+    //     });
 });
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<AlperyurtdasGymProjectContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("GymTracking"));
 });
+builder.Services.AddHttpClient<ITranslator, MyMemoryTranslateService>();
+
+// Push Notification Services
+builder.Services.AddHttpClient<GymProject.Services.PushNotificationService>();
+builder.Services.AddScoped<GymProject.Services.PushNotificationService>();
+builder.Services.AddScoped<GymProject.Services.PushTokenService>();
+
+// Translation Service
+builder.Services.AddHttpClient<GymProject.Services.TranslationService>();
+builder.Services.AddScoped<GymProject.Services.TranslationService>();
+
 DependencyInjection.Configure(builder.Services);
 var app = builder.Build();
 
@@ -80,9 +108,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.UseCors(policy => policy.AllowAnyMethod().AllowAnyHeader().SetIsOriginAllowed(origin => true).AllowCredentials());
 
-app.UseHttpsRedirection();
+// CORS middleware'i Authentication ve Authorization'dan ÖNCE olmalı
+app.UseCors("AllowAll");
+
+//app.UseHttpsRedirection(); // React web için HTTP'ye izin ver
 
 app.UseAuthentication();
 

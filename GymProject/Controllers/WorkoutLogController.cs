@@ -5,6 +5,7 @@ using GymProject.Models.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace GymProject.Controllers
 {
@@ -234,6 +235,64 @@ namespace GymProject.Controllers
 
                 var sessions = await _dbContext.WorkoutSessions
                     .Where(x => x.CustomerId == userId)
+                    .OrderByDescending(x => x.WorkoutDate)
+                    .ToListAsync();
+
+                // Her session için hareketleri getir
+                var sessionsWithMovements = sessions.Select(session =>
+                {
+                    var movements = _dbContext.WorkoutLogs
+                        .Where(x => x.WorkoutSessionId == session.WorkoutSessionId)
+                        .Select(log => new
+                        {
+                            log.WorkoutLogId,
+                            log.MovementId,
+                            log.MovementName,
+                            log.Weight,
+                            log.SetCount,
+                            log.Reps,
+                            log.Notes
+                        })
+                        .ToList();
+
+                    return new
+                    {
+                        session.WorkoutSessionId,
+                        session.WorkoutDate,
+                        session.TotalDuration,
+                        session.Notes,
+                        MovementCount = movements.Count,
+                        Movements = movements
+                    };
+                }).ToList();
+
+                return new ApiResponse("Success", "Antrenman oturumları başarıyla getirildi.", sessionsWithMovements);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return new ApiResponse("Error", $"Hata = {ex.Message}", null);
+            }
+        }
+
+        /// <summary>
+        /// Üye kendi antrenman oturumlarını görebilir (session bazlı)
+        /// </summary>
+        [HttpPost]
+        [Route("GetCustomersWorkoutSessions")]
+        [Authorize(Roles = "Admin,Trainer")]
+        public async Task<ApiResponse> GetCustomersWorkoutSessions([FromBody] CustomerRequest request)
+        {
+            try
+            {
+
+                if (string.IsNullOrEmpty(request.UserId))
+                {
+                    return new ApiResponse("Error", "Kullanıcı bilgisi bulunamadı.", null);
+                }
+
+                var sessions = await _dbContext.WorkoutSessions
+                    .Where(x => x.CustomerId == request.UserId)
                     .OrderByDescending(x => x.WorkoutDate)
                     .ToListAsync();
 
@@ -654,3 +713,4 @@ namespace GymProject.Controllers
     }
 }
 
+ 
